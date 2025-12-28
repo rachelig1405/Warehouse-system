@@ -2,7 +2,8 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import { google } from "googleapis";
-import fs from "fs";
+
+import "dotenv/config";
 
 dotenv.config();
 
@@ -13,7 +14,7 @@ app.use(express.json());
 const PORT = process.env.PORT || 5050;
 const SPREADSHEET_ID = process.env.SPREADSHEET_ID;
 const SHEET_NAME = process.env.SHEET_NAME || "גיליון1";
-const SA_PATH = process.env.GOOGLE_APPLICATION_CREDENTIALS || "./service-account.json";
+
 
 if (!SPREADSHEET_ID) throw new Error("Missing env: SPREADSHEET_ID");
 
@@ -55,14 +56,7 @@ function parseDateComparable(v) {
   return isNaN(d2.getTime()) ? null : d2.getTime();
 }
 
-/*async function getSheetsClient() {
-  const creds = JSON.parse(fs.readFileSync(SA_PATH, "utf8"));
-  const auth = new google.auth.GoogleAuth({
-    credentials: creds,
-    scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"]
-  });
-  return google.sheets({ version: "v4", auth });
-}
+
 async function getSheetsClient() {
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
   if (!raw) throw new Error("Missing env: GOOGLE_SERVICE_ACCOUNT_JSON");
@@ -75,19 +69,8 @@ async function getSheetsClient() {
   });
 
   return google.sheets({ version: "v4", auth });
-}*/
-async function getSheetsClient() {
-  const keyPath = new URL("./service-account.json", import.meta.url);
-  const raw = fs.readFileSync(keyPath, "utf8");
-  const creds = JSON.parse(raw);
-
-  const auth = new google.auth.GoogleAuth({
-    credentials: creds,
-    scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"]
-  });
-
-  return google.sheets({ version: "v4", auth });
 }
+
 
 
 const ALLOWED_STATUSES = new Set([
@@ -238,7 +221,7 @@ for (const r of matched) {
     res.status(500).json({ error: "Server error", details: String(err?.message || err) });
   }
 });
-
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on http://0.0.0.0:${PORT}`);
 });
+
