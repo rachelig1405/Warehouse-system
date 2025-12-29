@@ -132,37 +132,7 @@ app.get("/api/customers/:customerNo/orders", async (req, res) => {
       phone: normalize(pick(first, COLS.phone))
     };
 
-    // אגרגציה להזמנות: orderNo + orderType
-    /*const map = new Map();
-
-    for (const r of matched) {
-      const orderNo = normalize(pick(r, COLS.orderNo));
-      const orderType = normalize(pick(r, COLS.orderType));
-      const delivery = normalize(pick(r, COLS.deliveryDate));
-      if (!orderNo) continue;
-
-      const key = `${orderNo}__${orderType}`;
-      if (!map.has(key)) {
-        map.set(key, {
-          orderNo,
-          orderType,
-          lineCount: 0,
-          deliveryDateMax: ""
-        });
-      }
-
-      const obj = map.get(key);
-      obj.lineCount += 1;
-
-      const curTs = parseDateComparable(obj.deliveryDateMax);
-      const nextTs = parseDateComparable(delivery);
-
-      if (nextTs != null && (curTs == null || nextTs > curTs)) {
-        obj.deliveryDateMax = delivery;
-      } else if (!obj.deliveryDateMax && delivery) {
-        obj.deliveryDateMax = delivery;
-      }
-    }*/
+ 
   const map = new Map();
 
 for (const r of matched) {
@@ -216,6 +186,79 @@ for (const r of matched) {
     });
 
     res.json({ customer, orders });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error", details: String(err?.message || err) });
+  }
+});
+app.get("/api/orders/:orderNo", async (req, res) => {
+  try {
+    const orderNo = normalize(req.params.orderNo);
+    if (!orderNo) return res.status(400).json({ error: "orderNo is required" });
+
+    const sheets = await getSheetsClient();
+    const range = `${SHEET_NAME}!A:Q`;
+
+    const resp = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range
+    });
+
+    const values = resp.data.values || [];
+    if (values.length <= 1) return res.status(404).json({ error: "No data in sheet" });
+
+    const rows = values.slice(1);
+
+    // רק הזמנות בסטטוסים המותרים
+    const matched = rows.filter(r => {
+      const oNo = normalize(pick(r, COLS.orderNo));
+      if (oNo !== orderNo) return false;
+
+      const st = normalize(pick(r, COLS.status));
+      return ALLOWED_STATUSES.has(st);
+    });
+
+    if (matched.length === 0) {
+      return res.status(404).json({ error: "Order not found or not active" });
+    }
+
+    const first = matched[0];
+    const customer = {
+      customerNo: normalize(pick(first, COLS.customerNo)),
+      name: normalize(pick(first, COLS.customerName)),
+      contact: normalize(pick(first, COLS.contactName)),
+      phone: normalize(pick(first, COLS.phone))
+    };
+
+    // אגרגציה להזמנה אחת
+    let orderType = "";
+    let deliveryDateMax = "";
+    let lineCount = "";
+
+    for (const r of matched) {
+      orderType = orderType || normalize(pick(r, COLS.orderType));
+      const delivery = normalize(pick(r, COLS.deliveryDate));
+
+      const linesValRaw = normalize(pick(r, COLS.linesFromSheet));
+      const linesValNum = Number(linesValRaw);
+      if (!Number.isNaN(linesValNum) && linesValNum > 0) {
+        const current = Number(lineCount);
+        if (Number.isNaN(current) || linesValNum > current) lineCount = linesValNum;
+      }
+
+      const curTs = parseDateComparable(deliveryDateMax);
+      const nextTs = parseDateComparable(delivery);
+      if (nextTs != null && (curTs == null || nextTs > curTs)) {
+        deliveryDateMax = delivery;
+      } else if (!deliveryDateMax && delivery) {
+        deliveryDateMax = delivery;
+      }
+    }
+
+    res.json({
+      customer,
+      order: { orderNo, orderType, lineCount, deliveryDateMax }
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error", details: String(err?.message || err) });
