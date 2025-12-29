@@ -219,7 +219,10 @@ app.get("/api/orders/:orderNo", async (req, res) => {
     if (!orderNo) return res.status(400).json({ error: "orderNo is required" });
 
     const sheets = await getSheetsClient();
-    const range = `${SHEET_NAME}!A:Q`;
+   //const range = `${SHEET_NAME}!A:Q`;
+   const safeSheetName = `'${String(SHEET_NAME).replace(/'/g, "''")}'`;
+  const range = `${safeSheetName}!A:Q`;
+
 
     const resp = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
