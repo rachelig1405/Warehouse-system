@@ -90,6 +90,25 @@ app.get("/api/health", (_req, res) => res.json({ ok: true }));
  *   orders: [{ orderNo, orderType, lineCount, deliveryDateMax }]
  * }
  */
+app.get("/api/debug/sheets", async (_req, res) => {
+  try {
+    const sheets = await getSheetsClient();
+    const meta = await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID });
+
+    const names = (meta.data.sheets || [])
+      .map(s => s.properties?.title)
+      .filter(Boolean);
+
+    res.json({
+      configuredSheetName: SHEET_NAME,
+      sheetNames: names
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error", details: String(err?.message || err) });
+  }
+});
+
 app.get("/api/customers/:customerNo/orders", async (req, res) => {
   try {
     const customerNo = normalize(req.params.customerNo);
